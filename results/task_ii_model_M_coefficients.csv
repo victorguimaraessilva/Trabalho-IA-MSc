@@ -1,0 +1,11 @@
+Variável,Coeficiente (Θ)
+CPU ociosa (%),-0.092133
+Memória usada (%),-0.086789
+Taxa de criação de processos (/s),-0.011961
+Taxa de troca de contexto (/s),-9.7e-05
+File handles em uso,-0.003088
+Taxa de interrupções (/s),2.5e-05
+Média de carga — 1 min,-0.060592
+Sockets TCP em uso,-0.065342
+Taxa de liberação de páginas (/s),-2e-05
+Intercepto (Θ₀),49.687811

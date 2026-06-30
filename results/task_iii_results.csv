@@ -1,0 +1,6 @@
+Classificador,Observações no treino,Tempo de treino (ms),Erro de classificação (ERR),ERR (%),Acurado (< 15%)?,Verdadeiros positivos (VP),Verdadeiros negativos (VN),Falsos positivos (FP),Falsos negativos (FN)
+C1,50,118.9537,0.1537,15.3704,Não,438,476,59,107
+C2,500,275.0919,0.1296,12.963,Sim,465,475,60,80
+C3,1000,262.2902,0.1287,12.8704,Sim,464,477,58,81
+C4,1500,1373.2189,0.1139,11.3889,Sim,479,478,57,66
+C5,2520,2526.5507,0.1111,11.1111,Sim,486,474,61,59

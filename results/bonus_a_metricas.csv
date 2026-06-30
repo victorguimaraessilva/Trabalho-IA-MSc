@@ -1,0 +1,4 @@
+Métrica,Valor,Significado
+MAE,3.2021,Erro médio absoluto entre Qual medido e estimado (dB)
+RMSE,3.8046,Raiz do erro quadrático médio — penaliza erros grandes
+R²,0.2859,"Fração da variância de Qual explicada pelo modelo (quanto mais perto de 1, melhor)"

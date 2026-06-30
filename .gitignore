@@ -1,11 +1,38 @@
+# ============================================================
+# .gitignore — PGC308A: Estimativa de Conformidade a SLAs
+# Repositório público — arquivos privados/pessoais excluídos
+# ============================================================
 
-
+# ------------------------------------------------------------
+# Documentos pessoais / acadêmicos privados
+# ------------------------------------------------------------
+Relatorio_Final_PGC308A_Raquel_Victor.pdf
+comparacao_relatorios_ia_sla.pdf
+relatorio_ia_sla.pdf
+relatorio_ia_sla.docx
+relatorio_PGC308A_2026.pdf
+relatorio_PGC308A_2026.docx
 relatorio_PGC308A_2026_final.pdf
-relatorio/
+
+# Roteiro oral (uso pessoal)
+explicacao.MD
+
+# Enunciado do professor (não redistribuir)
+Trabalho_de_IA_PGC308A_2026.pdf
+
+# ------------------------------------------------------------
+# Scripts de geração de relatório (uso interno)
+# ------------------------------------------------------------
 scripts/
 
 # ------------------------------------------------------------
-# Pasta de geração do relatório (arquivos de build)
+# Pasta da monografia LaTeX (não faz parte da entrega pública)
+# ------------------------------------------------------------
+Monografia_do_PPGCO___FACOM_UFU/
+
+# ------------------------------------------------------------
+# Arquivos de build LaTeX dentro de relatorio/
+# (o .tex e o .pdf ficam no repositório)
 # ------------------------------------------------------------
 relatorio/*.aux
 relatorio/*.log
@@ -23,7 +50,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
 
 # Ambientes virtuais
 .venv/
