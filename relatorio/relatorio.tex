@@ -16,55 +16,77 @@
 \usepackage{setspace}
 \usepackage{indentfirst}
 \usepackage{enumerate}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{pdflscape}
 
 \onehalfspacing
 
-\hypersetup{
-  colorlinks=true,
-  linkcolor=black,
-  urlcolor=blue,
-  citecolor=black
-}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
 
 \lstset{
   language=Python,
   basicstyle=\small\ttfamily,
   keywordstyle=\color{blue}\bfseries,
-  commentstyle=\color{gray},
-  stringstyle=\color{orange},
-  breaklines=true,
-  frame=single,
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  xleftmargin=1.5em,
-  framexleftmargin=1.5em
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{orange!80!black},
+  breaklines=true, frame=single,
+  numbers=left, numberstyle=\tiny\color{gray},
+  xleftmargin=1.5em, framexleftmargin=1.5em,
+  showstringspaces=false
 }
-
-\title{%
-  \textbf{PGC308A -- Estimativa de Conformidade a SLAs}\\[0.3em]
-  \large Relatório Final -- 2026/1
-}
-\author{
-  Victor Guimarães Silva \and Raquel de Fátima Alves\\[0.3em]
-  \small PPGCO/FACOM -- Universidade Federal de Uberlândia
-}
-\date{Junho de 2026}
 
 \begin{document}
-\maketitle
-\thispagestyle{empty}
 
+%% ============================================================
+%% CAPA
+%% ============================================================
+\begin{titlepage}
+  \centering
+  \textbf{Universidade Federal de Uberlândia --- UFU}\\[0.3em]
+  \textbf{Faculdade de Computação --- FACOM}\\[2.5em]
+  \includegraphics[width=3.8cm]{figs/logo-ufu2.png}\\[3em]
+  {\Large\bfseries Estimativa de Conformidade a SLAs em Serviços de\\[0.3em]
+  Vídeo sob Demanda mediante Aprendizado de Máquina}\\[1em]
+  {\large\itshape Análise Exploratória, Regressão Linear,
+  Classificação Logística e Extensão 5G}\\[4em]
+  \textbf{Autores:} Raquel de Fátima Alves e Victor Guimarães Silva\\[0.5em]
+  \textbf{Professor:} Rafael Pasquini\\[0.5em]
+  PGC308A --- Internet do Futuro\\[0.5em]
+  \vfill
+  27 de junho de 2026\\
+  Uberlândia --- MG
+\end{titlepage}
+
+\thispagestyle{empty}
+\newpage
+
+%% ============================================================
+%% RESUMO
+%% ============================================================
 \begin{abstract}
-Este relatório descreve a implementação e análise de modelos de aprendizado de máquina
-supervisionado para estimar a conformidade a SLAs em um serviço de vídeo sob demanda (VoD).
-O problema consiste em prever, a partir de métricas do servidor Linux, se o serviço atende
-ao SLA definido como taxa mínima de frames no cliente ($\geq 18$ fps).
-Foram implementadas três tasks: exploração dos dados (Task~I), regressão linear para
-estimativa contínua dos fps (Task~II) e regressão logística para classificação binária
-de conformidade (Task~III). Como atividade bônus, aplicou-se regressão linear à predição
-de qualidade de sinal 5G em traces coletados em campo em São Paulo.
-O código-fonte completo está disponível em:
+\noindent
+Este relatório apresenta o desenvolvimento do trabalho de estimativa de conformidade
+com Acordos de Nível de Serviço (SLAs), realizado na disciplina Internet do Futuro ---
+PGC308A, da Universidade Federal de Uberlândia. O estudo avalia a conformidade de um
+serviço de vídeo sob demanda (VoD) em relação a um SLA, utilizando um trace composto
+por 3.600 observações coletadas a cada segundo durante uma hora. As estatísticas do
+sistema operacional do servidor compõem o vetor de entrada (X), enquanto a taxa de
+frames exibidos no cliente (\texttt{DispFrames}) representa a métrica de qualidade (Y).
+Considera-se conformidade quando $\texttt{DispFrames} \geq 18$~fps.
+Na Task~I, foi realizada a exploração descritiva e visual dos dados.
+Na Task~II, aplicou-se regressão linear, obtendo-se NMAE de 10,39\% no conjunto de
+teste (1.080 observações), abaixo do limiar de 15\%.
+Na Task~III, utilizou-se regressão logística para classificar a conformidade ao SLA,
+alcançando o melhor ERR de 11,11\% (C5).
+Como atividade bônus, foi implementada a predição do indicador \texttt{Qual} em traces
+5G, obtendo MAE de 3{,}20~dB e $R^2 = 0{,}29$.
+O código-fonte completo está disponível em
 \url{https://github.com/victorguimaraessilva/Trabalho-IA-MSc}.
+
+\medskip\noindent
+\textit{Palavras-chave:} SLA; QoS; vídeo sob demanda; regressão linear;
+regressão logística; garantia de serviço; redes 5G; aprendizado de máquina.
 \end{abstract}
 
 \tableofcontents
@@ -74,291 +96,374 @@ O código-fonte completo está disponível em:
 \section{Introdução}
 %% ============================================================
 
-Provedores de serviços de vídeo sob demanda (VoD) precisam garantir que os usuários
-recebam qualidade satisfatória de reprodução. O \textit{Service Level Agreement} (SLA)
-formaliza esse compromisso: neste trabalho, o SLA é definido como a taxa de frames
-percebida pelo cliente (\texttt{DispFrames}) igual ou superior a 18 fps.
-Medir diretamente a qualidade no terminal do usuário em tempo real é, em geral,
-inviável em escala. A alternativa estudada neste trabalho é usar \textbf{aprendizado
-de máquina supervisionado} para inferir a qualidade do cliente a partir de métricas
-coletadas no próprio servidor -- uma prática conhecida como \textit{service assurance}.
+Serviços de telecomunicações e aplicações de Internet dependem de infraestruturas
+complexas, nas quais a qualidade percebida pelo usuário deve ser continuamente
+monitorada e garantida. Nesse contexto, os Acordos de Nível de Serviço
+(\textit{Service Level Agreements} --- SLAs) formalizam compromissos de desempenho
+entre provedor e cliente \cite{james2013}. Neste trabalho, a qualidade de um serviço
+de vídeo sob demanda (VoD) é avaliada a partir da taxa de frames exibidos no terminal
+do cliente, enquanto o provedor dispõe apenas de métricas coletadas no servidor em que
+o serviço é hospedado.
 
-O conjunto de dados contém 3.600 observações, uma por segundo, durante uma hora de operação.
-As variáveis de entrada (X) descrevem o estado do servidor Linux (CPU, memória, processos,
-rede, etc.) e a variável alvo (Y) é a taxa de frames observada no cliente (\texttt{DispFrames}).
+A hipótese investigada é que relações estatísticas entre métricas de infraestrutura e
+qualidade percebida no cliente podem ser aprendidas por modelos supervisionados de
+aprendizado de máquina \cite{yanggratoken2014}. Dessa forma, torna-se possível estimar,
+em tempo quase real, tanto o valor contínuo da métrica de serviço (regressão) quanto a
+conformidade binária ao SLA (classificação). O enunciado propõe o uso de modelos
+lineares interpretáveis como linha de base, priorizando a compreensão dos coeficientes
+e da relação entre as variáveis em vez da busca pela máxima acurácia preditiva.
 
-Três tasks foram propostas: (I) exploração e análise dos dados; (II) regressão linear para
-prever os fps com métrica NMAE; e (III) regressão logística para classificar o serviço como
-\textit{conforme} ou \textit{em violação} do SLA com métrica ERR. Adicionalmente, foi
-implementada a Atividade~A do 5G Datasets Challenge como bônus.
-
-O repositório com todos os notebooks e código-fonte está disponível publicamente em:\\
-\url{https://github.com/victorguimaraessilva/Trabalho-IA-MSc}
+O relatório está organizado conforme a ordem das tarefas propostas no enunciado:
+Task~I (exploração), Task~II (regressão linear), Task~III (classificação logística) e
+atividade bônus (traces 5G). Em cada seção, são apresentados a metodologia adotada,
+os resultados, as figuras e tabelas correspondentes, e a interpretação dos principais
+achados.
 
 %% ============================================================
-\section{Dados e Metodologia}
+\section{Materiais e Métodos}
 %% ============================================================
 
-\subsection{Descrição dos Dados}
+\subsection{Cenário e base de dados VoD}
 
-O dataset é composto por dois arquivos:
-\begin{itemize}
-  \item \textbf{X.csv}: 9 métricas do servidor Linux, amostradas a cada segundo;
-  \item \textbf{Y.csv}: taxa de frames no cliente (\texttt{DispFrames}, em fps), no mesmo instante.
-\end{itemize}
-
-A Tabela~\ref{tab:variaveis} descreve cada variável de entrada.
+Utilizou-se o trace público \textit{realm-in 2015-vod-traces} \cite{yanggratoken2015}
+(3.600 observações, amostragem 1~Hz). Os arquivos \texttt{X.csv} e \texttt{Y.csv}
+foram unidos pelo campo \texttt{TimeStamp}. A configuração conceitual consiste em um
+cliente conectado a um servidor VoD via rede; X captura o estado do SO no servidor e
+Y a taxa de frames no cliente. A Tabela~\ref{tab:variaveis} descreve todas as variáveis.
 
 \begin{table}[H]
 \centering
-\caption{Variáveis de entrada (servidor) e variável alvo (cliente).}
+\caption{Variáveis do trace VoD.}
 \label{tab:variaveis}
-\begin{tabular}{llr}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\ttfamily}lp{10cm}}
 \toprule
-\textbf{Variável} & \textbf{Significado} & \textbf{Unidade} \\
+\normalfont\textbf{Identificador} & \textbf{Descrição} \\
 \midrule
-\texttt{all\_..idle}  & CPU ociosa                    & \% \\
-\texttt{X..memused}   & Memória RAM usada             & \% \\
-\texttt{proc.s}       & Taxa de criação de processos  & proc/s \\
-\texttt{cswch.s}      & Trocas de contexto            & trocas/s \\
-\texttt{file.nr}      & File handles abertos          & contagem \\
-\texttt{sum\_intr.s}  & Taxa de interrupções          & int/s \\
-\texttt{ldavg.1}      & Média de carga (1 min)        & adimensional \\
-\texttt{tcpsck}       & Sockets TCP em uso            & contagem \\
-\texttt{pgfree.s}     & Liberação de páginas          & páginas/s \\
-\midrule
-\texttt{DispFrames}   & \textbf{Taxa de frames no cliente (alvo)} & \textbf{fps} \\
+all\_..idle  & Percentual de tempo em que a CPU do servidor está ociosa (\%) \\
+X..memused   & Percentual de memória RAM utilizada no servidor (\%) \\
+proc.s       & Taxa de criação de processos no sistema (processos/s) \\
+cswch.s      & Taxa de troca de contexto da CPU (trocas/s) \\
+file.nr      & Quantidade de file handles abertos no sistema operacional \\
+sum\_intr.s  & Taxa de interrupções de hardware e software (interrupções/s) \\
+ldavg.1      & Média de carga da CPU nos últimos 60 segundos \\
+tcpsck       & Número de sockets TCP atualmente em uso \\
+pgfree.s     & Taxa de liberação de páginas de memória (páginas/s) \\
+DispFrames   & Taxa de frames de vídeo exibidos no cliente (fps) --- \textbf{alvo Y} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Protocolo Experimental}
+\subsection{Protocolo de validação}
 
-Em todas as tasks, foi adotado o seguinte protocolo:
-\begin{itemize}
-  \item \textbf{Divisão treino/teste:} 70\% treino (2.520 obs.) e 30\% teste (1.080 obs.),
-        seleção uniformemente aleatória com \texttt{random\_state=42};
-  \item \textbf{Modelos:} regressão linear e logística do \texttt{scikit-learn};
-  \item \textbf{SLA:} serviço \textit{conforme} quando \texttt{DispFrames} $\geq 18$ fps.
-\end{itemize}
+Para as Tasks~II e~III, adotou-se a técnica de conjunto de validação
+(\textit{validation set}): 2.520 observações para treino (70\%) e 1.080 para teste
+(30\%), com amostragem aleatória uniforme e \texttt{random\_state\,=\,42} para
+reprodutibilidade \cite{pasquini2026}. A partir do conjunto de treino, geraram-se
+subconjuntos de 50, 500, 1.000, 1.500 e 2.520 observações para estudar o impacto do
+tamanho da amostra de treino.
 
-O trecho abaixo ilustra a configuração central do projeto:
+A implementação foi realizada em Python~3, com \texttt{pandas} (manipulação de dados),
+\texttt{scikit-learn} (modelos), \texttt{matplotlib} e \texttt{seaborn}
+(visualização). O código está organizado em notebooks por tarefa e módulos
+reutilizáveis em \texttt{src/}. O trecho a seguir ilustra as constantes centrais:
 
 \begin{lstlisting}[caption={Constantes centrais do projeto (\texttt{src/config.py}).}]
-SLA_THRESHOLD_FPS = 18.0   # fps -- limiar de conformidade
-TRAIN_FRACTION    = 0.70   # 70% treino
-RANDOM_STATE      = 42     # reproducibilidade
+SLA_THRESHOLD_FPS = 18    # fps -- limiar de conformidade ao SLA
+TRAIN_FRACTION    = 0.70  # 70% treino / 30% teste
+RANDOM_STATE      = 42    # semente para reproducibilidade
 TRAIN_SIZES = [50, 500, 1000, 1500, 2520]
 \end{lstlisting}
 
 %% ============================================================
-\section{Task I -- Exploração dos Dados}
+\section{Task I --- Exploração dos Dados}
 %% ============================================================
 
-\subsection{Estatísticas Descritivas}
+\subsection{Item 1 --- Estatísticas descritivas}
 
-A Tabela~\ref{tab:stats} apresenta as estatísticas descritivas das variáveis mais relevantes.
+O Item~1 solicita, para cada componente de X e Y, as estatísticas: média, máximo,
+mínimo, percentil 25, percentil 90 e desvio padrão. A Tabela~\ref{tab:stats}
+consolida esses valores, calculados sobre as 3.600 observações do trace.
+
+\begin{landscape}
+\begin{table}[H]
+\centering
+\caption{Estatísticas descritivas de X e Y (3.600 observações).}
+\label{tab:stats}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+\textbf{Estatística}
+  & \textbf{\shortstack{CPU\\ociosa\\(\%)}}
+  & \textbf{\shortstack{Memória\\usada\\(\%)}}
+  & \textbf{\shortstack{Taxa\\proc.\\(/s)}}
+  & \textbf{\shortstack{Troca\\ctx.\\(/s)}}
+  & \textbf{\shortstack{File\\handles}}
+  & \textbf{\shortstack{Interrup.\\(/s)}}
+  & \textbf{\shortstack{Carga\\CPU\\(1~min)}}
+  & \textbf{\shortstack{Sockets\\TCP}}
+  & \textbf{\shortstack{Lib.\\pág.\\(/s)}}
+  & \textbf{\shortstack{DispFrames\\(fps)}} \\
+\midrule
+Média       &  9{,}0650 & 89{,}1375 & 7{,}6833 & 54045{,}87 & 2656{,}33 & 19978{,}04 &  75{,}8758 & 48{,}9975 & 72872{,}15 & 18{,}8184 \\
+Máximo      & 69{,}5400 & 97{,}8400 & 48{,}0000 & 83880{,}00 & 2976{,}00 & 35536{,}00 & 147{,}4700 & 87{,}0000 & 145874{,}00 & 30{,}3900 \\
+Mínimo      &  0{,}0000 & 73{,}0300 &  0{,}0000 & 11398{,}00 & 2304{,}00 & 10393{,}00 &  11{,}1300 & 21{,}0000 & 15928{,}00 &  0{,}0000 \\
+Percentil 25 &  0{,}0000 & 82{,}9650 &  0{,}0000 & 31302{,}00 & 2496{,}00 & 16678{,}00 &  28{,}2000 & 34{,}0000 & 61601{,}75 & 13{,}3900 \\
+Percentil 90 & 38{,}6210 & 96{,}7700 & 20{,}0000 & 72135{,}10 & 2880{,}00 & 28228{,}40 & 127{,}9930 & 71{,}0000 & 97532{,}50 & 24{,}6100 \\
+Desvio padrão & 16{,}1228 &  8{,}1837 &  8{,}5326 & 19497{,}81 &  196{,}11 &  4797{,}27 &  43{,}8624 & 15{,}8712 & 19504{,}32 &  5{,}2198 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{landscape}
+
+\textbf{Interpretação:} a taxa média de frames foi de 18{,}82~fps, valor muito
+próximo ao limiar de SLA (18~fps), indicando que o serviço opera frequentemente
+na fronteira entre conformidade e degradação. A memória média ($\approx 89\%$) e
+a baixa CPU ociosa ($\approx 9\%$) sugerem servidor sob carga sustentada durante o
+trace. O desvio padrão de \texttt{DispFrames} (5{,}22~fps) revela variabilidade
+significativa na qualidade entregue ao cliente.
+
+\subsection{Item 2 --- Consultas específicas}
 
 \begin{table}[H]
 \centering
-\caption{Estatísticas descritivas das principais variáveis (3.600 obs.).}
-\label{tab:stats}
-\begin{tabular}{lrrrrr}
+\caption{Respostas às consultas do Item~2.}
+\label{tab:consultas}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{clp{8.5cm}}
 \toprule
-\textbf{Variável} & \textbf{Média} & \textbf{Mín.} & \textbf{P25} & \textbf{P90} & \textbf{Desvio Padrão} \\
+\textbf{Item} & \textbf{Resultado} & \textbf{Interpretação} \\
 \midrule
-CPU ociosa (\%)       &  9,1  &  0,0  &  4,5  & 19,2  &  8,4 \\
-Memória usada (\%)    & 88,9  & 73,0  & 87,2  & 92,3  &  3,8 \\
-Sockets TCP           & 46,2  & 39,0  & 44,0  & 52,0  &  4,3 \\
-\texttt{DispFrames}   & 18,8  &  0,0  & 16,4  & 25,2  &  5,2 \\
+(a) & 2.875 observações & Quantidade de amostras com uso de memória superior a 80\% \\
+(b) & 46{,}3473 sockets   & Média de sockets TCP quando a taxa de interrupções excede 18.000/s \\
+(c) & 73{,}03\%           & Menor utilização de memória entre amostras com CPU ociosa abaixo de 20\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-A média de \texttt{DispFrames} é 18,8 fps, muito próxima do limiar de SLA (18 fps),
-indicando que o serviço opera frequentemente na fronteira da conformidade.
-A memória usada permanece acima de 73\% em todos os instantes, evidenciando
-um servidor consistentemente carregado.
+Em 2.875 das 3.600 observações (79{,}9\%), a memória superou 80\%,
+reforçando a pressão de recursos. Mesmo com CPU pouco ociosa, a memória mínima
+permaneceu em 73{,}03\%, ou seja, o servidor não apresentou folga significativa de RAM
+sequer nos momentos de maior utilização de CPU.
 
-\subsection{Consultas Específicas}
+O código a seguir ilustra como foram obtidas as respostas do Item~2:
 
-\begin{enumerate}[(a)]
-  \item \textbf{Observações com memória $> 80\%$:} 2.875 (79,9\% do trace).
-  \item \textbf{Média de sockets TCP quando interrupções $> 18.000$/s:} 46,35.
-  \item \textbf{Mínimo de memória quando CPU ociosa $< 20\%$:} 73,03\%.
-\end{enumerate}
+\begin{lstlisting}[caption={Consultas específicas sobre o dataset (Item~2 da Task~I).}]
+# (a) observacoes com memoria > 80%
+q2a = int((df["X..memused"] > 80).sum())  # resultado: 2875
 
-O resultado (a) confirma que o servidor raramente opera com memória baixa.
-O resultado (c) mostra que, mesmo sob alta carga de CPU, a memória se mantém elevada,
-sugerindo que ambos os recursos são pressionados simultaneamente.
+# (b) media de sockets TCP quando interrupcoes > 18000/s
+q2b = df.loc[df["sum_intr.s"] > 18000, "tcpsck"].mean()  # 46.3473
 
-\subsection{Visualizações}
+# (c) minimo de memoria quando CPU ociosa < 20%
+q2c = df.loc[df["all_..idle"] < 20, "X..memused"].min()  # 73.03
+\end{lstlisting}
+
+\subsection{Item 3 --- Visualizações}
+
+\textbf{Item 3(a):} série temporal de CPU ociosa e memória usada.
 
 \begin{figure}[H]
   \centering
-  \begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth]{figs/task_i_3a_timeseries_cpu_mem.png}
-    \caption{Série temporal de CPU ociosa e memória usada.}
-    \label{fig:ts_cpu_mem}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth]{figs/task_i_3b_kde_cpu_mem.png}
-    \caption{KDE de CPU ociosa e memória usada.}
-    \label{fig:kde_cpu_mem}
-  \end{subfigure}
-  \caption{Comportamento das métricas do servidor ao longo do trace (Task~I).}
-  \label{fig:task_i}
+  \includegraphics[width=0.85\textwidth]{figs/task_i_3a_timeseries_cpu_mem.png}
+  \caption{Evolução temporal da CPU ociosa e da memória utilizada ao longo das 3.600 observações.}
+  \label{fig:ts_cpu_mem}
 \end{figure}
 
-A Figura~\ref{fig:ts_cpu_mem} mostra que a CPU ociosa apresenta grande variabilidade
-ao longo do tempo, com picos e vales frequentes, enquanto a memória permanece estável
-e elevada. O KDE (Figura~\ref{fig:kde_cpu_mem}) revela que a CPU ociosa possui distribuição
-multimodal (com concentração entre 0--10\%), ao passo que a memória tem distribuição
-estreita centrada em torno de 89\%, confirmando o comportamento observado nas estatísticas.
+A série temporal (Figura~\ref{fig:ts_cpu_mem}) revela variabilidade ao longo da hora
+de coleta, com memória persistentemente elevada e picos de utilização de CPU. A CPU
+ociosa permanece próxima de zero na maior parte do tempo, com surtos pontuais que
+podem refletir períodos de menor demanda pelo serviço VoD.
+
+\textbf{Item 3(b):} estimativas de densidade kernel (KDE) para CPU ociosa e memória.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figs/task_i_3b_kde_cpu_mem.png}
+  \caption{Distribuição (KDE) da CPU ociosa e da memória utilizada.}
+  \label{fig:kde_cpu_mem}
+\end{figure}
+
+As curvas KDE (Figura~\ref{fig:kde_cpu_mem}) complementam as estatísticas descritivas:
+a memória concentra-se em faixas altas (80--97\%), enquanto a CPU ociosa apresenta
+distribuição assimétrica com moda próxima de zero. Esse padrão é consistente com um
+servidor operando próximo ao limite de capacidade de forma sustentada.
 
 %% ============================================================
-\section{Task II -- Regressão Linear}
+\section{Task II --- Estimativa da Métrica de Serviço (Regressão)}
 %% ============================================================
 
-\subsection{Objetivo e Métrica}
+\subsection{Item 1 --- Modelo M com treino completo}
 
-O objetivo é estimar \texttt{DispFrames} (valor contínuo) a partir das 9 variáveis do servidor.
-A métrica de avaliação é o \textbf{NMAE} (Normalized Mean Absolute Error):
-
+O objetivo é aprender uma função $M: X \rightarrow \hat{Y}$ que aproxime
+\texttt{DispFrames}. Utilizou-se regressão linear múltipla (\texttt{LinearRegression}
+do \texttt{scikit-learn}). O erro de estimação é o NMAE:
 \begin{equation}
   \text{NMAE} = \frac{1}{\bar{y}} \cdot \frac{1}{m} \sum_{i=1}^{m} |y_i - \hat{y}_i|
 \end{equation}
-
 onde $\bar{y}$ é a média de \texttt{DispFrames} no conjunto de teste e $m = 1.080$.
-O critério do enunciado é NMAE $< 15\%$.
+O modelo é considerado preciso se NMAE $< 15\%$.
 
-\subsection{Implementação}
+O trecho abaixo mostra o treinamento e avaliação do modelo M:
 
-\begin{lstlisting}[caption={Treinamento e avaliação do modelo de regressão linear.}]
+\begin{lstlisting}[caption={Treinamento e avaliação do modelo de regressão linear (Task~II).}]
 from sklearn.linear_model import LinearRegression
 from src.metrics import nmae
+from src.splits import train_test_split_trace
+
+train_df, test_df, X_train, y_train, X_test, y_test = \
+    train_test_split_trace(df, features, target)
 
 model = LinearRegression()
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 
-error = nmae(y_test, y_pred)   # NMAE normalizado pela media de y_test
+erro = nmae(y_test, y_pred)  # normaliza pelo y_bar do teste
 \end{lstlisting}
 
-\subsection{Coeficientes do Modelo M (treino completo)}
-
 \begin{table}[H]
 \centering
-\caption{Coeficientes do modelo de regressão linear treinado com 2.520 observações.}
-\label{tab:coef_reg}
+\caption{Coeficientes do modelo M ($\Theta_1 \ldots \Theta_9$ e $\Theta_0$).}
+\label{tab:coef_m}
+\renewcommand{\arraystretch}{1.2}
 \begin{tabular}{lr}
 \toprule
-\textbf{Variável} & \textbf{Coeficiente ($\Theta$)} \\
+\textbf{Variável} & \textbf{Coeficiente} \\
 \midrule
-CPU ociosa (\%)                  & $-0{,}0921$ \\
-Memória usada (\%)               & $-0{,}0868$ \\
-Média de carga --- 1 min         & $-0{,}0606$ \\
-Sockets TCP em uso               & $-0{,}0653$ \\
-Taxa de criação de processos     & $-0{,}0120$ \\
-File handles em uso              & $-0{,}0031$ \\
-Taxa de trocas de contexto       & $\approx 0$ \\
-Taxa de interrupções             & $\approx 0$ \\
-Taxa de liberação de páginas     & $\approx 0$ \\
-\textbf{Intercepto ($\Theta_0$)} & $\mathbf{49{,}69}$ \\
+CPU ociosa (\%)                   & $-0{,}0921$ \\
+Memória usada (\%)                & $-0{,}0868$ \\
+Taxa de processos (/s)            & $-0{,}0120$ \\
+Troca de contexto (/s)            & $-0{,}0001$ \\
+File handles                      & $-0{,}0031$ \\
+Interrupções (/s)                 & $+0{,}0000$ \\
+Carga CPU (1~min)                 & $-0{,}0606$ \\
+Sockets TCP                       & $-0{,}0653$ \\
+Liberação de páginas (/s)         & $-0{,}0000$ \\
+\textbf{Intercepto ($\Theta_0$)}  & $\mathbf{49{,}6878}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-Todos os coeficientes significativos são negativos, indicando que maiores valores de
-pressão no servidor (memória ocupada, carga de CPU, sockets ativos) estão associados
-a estimativas menores de taxa de frames. O intercepto de 49,69 representa o valor
-esperado de \texttt{DispFrames} quando todas as variáveis estão zeradas -- um valor
-de referência sem interpretação física direta, dado que as variáveis não assumem valor
-nulo na prática.
-
-\subsection{Resultados por Tamanho de Treino}
 
 \begin{table}[H]
 \centering
-\caption{NMAE e tempo de treino em função do tamanho do conjunto de treino.}
-\label{tab:nmae}
-\begin{tabular}{rrcc}
+\caption{Desempenho do modelo M no conjunto de teste.}
+\label{tab:desemp_m}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll}
 \toprule
-\textbf{Obs. de treino} & \textbf{Tempo (ms)} & \textbf{NMAE (\%)} & \textbf{Acurado?} \\
+\textbf{Métrica} & \textbf{Valor} & \textbf{Critério} \\
 \midrule
-   50 & 1,1 & 11,52 & Sim \\
-  500 & 1,9 & 10,58 & Sim \\
-1.000 & 1,2 & 10,49 & Sim \\
-1.500 & 1,2 & 10,38 & Sim \\
-\textbf{2.520} & \textbf{2,6} & \textbf{10,39} & \textbf{Sim} \\
+NMAE               & 10{,}3877\% & $< 15\%$ \\
+Acurado?           & Sim         & ---      \\
+Observações de teste & 1.080     & ---      \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+O NMAE de 10{,}39\% indica erro médio relativo modesto. Coeficientes negativos em
+variáveis de pressão do servidor (memória, carga, sockets TCP) associam-se a estimativas
+menores de fps, coerente com a degradação de serviço sob estresse de recursos. O
+intercepto de 49{,}69 representa o valor base do modelo quando todas as variáveis são
+nulas --- situação hipotética sem interpretação física direta.
+
+\subsubsection{Itens 1(c--e) --- Gráficos no conjunto de teste}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.6\textwidth]{figs/task_ii_2d_nmae_train_time.png}
-  \caption{NMAE e tempo de treino em função do número de observações de treino (Task~II).}
-  \label{fig:nmae_train}
+  \includegraphics[width=0.88\textwidth]{figs/task_ii_1c_timeseries_test.png}
+  \caption{Valores medidos e estimados de \texttt{DispFrames} no conjunto de teste.}
+  \label{fig:ts_test}
 \end{figure}
 
-A Figura~\ref{fig:nmae_train} mostra que, mesmo com apenas 50 amostras, o modelo
-já atinge NMAE $= 11{,}52\%$, abaixo do limiar de 15\%. O ganho de acurácia ao
-aumentar o treino de 500 para 2.520 observações é inferior a 0,2 pp, caracterizando
-\textbf{retornos decrescentes}. O tempo de treino permanece sub-milissegundo a poucos ms,
-irrelevante para a decisão de tamanho.
-
-\subsection{Análise no Conjunto de Teste}
+O modelo acompanha a tendência geral dos dados (Figura~\ref{fig:ts_test}), com
+divergências nos extremos e em transições rápidas. Nos períodos em que
+\texttt{DispFrames} cai abruptamente para valores próximos de zero, o modelo não
+consegue capturar a queda com a mesma velocidade, o que é esperado em um modelo
+linear sem componente temporal.
 
 \begin{figure}[H]
   \centering
   \begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth]{figs/task_ii_1c_timeseries_test.png}
-    \caption{Série temporal: medido vs.\ estimado.}
+    \includegraphics[width=\textwidth]{figs/task_ii_1d_kde_dispframes_test.png}
+    \caption{KDE de \texttt{DispFrames} no teste.}
+    \label{fig:kde_disp}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.48\textwidth}
     \includegraphics[width=\textwidth]{figs/task_ii_1e_kde_abs_errors.png}
     \caption{KDE dos erros absolutos $|y - \hat{y}|$.}
+    \label{fig:kde_err}
   \end{subfigure}
-  \caption{Avaliação do modelo de regressão linear no conjunto de teste (Task~II).}
-  \label{fig:reg_test}
+  \caption{Distribuições de \texttt{DispFrames} e dos erros absolutos no conjunto de teste (Task~II).}
+  \label{fig:kde_taskii}
 \end{figure}
 
-A série temporal (Figura~\ref{fig:reg_test}a) mostra que o modelo acompanha a tendência
-geral dos fps, errando mais nos picos e vales -- onde a taxa de frames muda abruptamente.
-O KDE dos erros absolutos (Figura~\ref{fig:reg_test}b) confirma que a maioria dos erros
-se concentra abaixo de 5 fps, com cauda longa em eventos extremos.
-O NMAE do modelo completo é \textbf{10,39\%}, abaixo do limite de 15\%.
+A Figura~\ref{fig:kde_disp} revela distribuição bimodal de \texttt{DispFrames} no
+teste, com concentrações em torno de 14~fps e 24~fps, refletindo dois regimes de
+operação do servidor. O KDE dos erros absolutos (Figura~\ref{fig:kde_err}) mostra que
+a maioria dos erros se concentra abaixo de 5~fps, com cauda longa para eventos extremos.
+
+\textbf{Item 1(f) --- Discussão:} a regressão linear oferece baseline interpretável e
+atende ao critério de acurácia. Limitações incluem a incapacidade de capturar
+não-linearidades e a sensibilidade a outliers na taxa de frames.
+
+\subsection{Item 2 --- Impacto do tamanho do treino (M\textsubscript{1}\ldots{}M\textsubscript{5})}
+
+\begin{table}[H]
+\centering
+\caption{NMAE e tempo de treino para diferentes tamanhos de conjunto de treino.}
+\label{tab:nmae_treino}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{rrrr}
+\toprule
+\textbf{Treino (obs.)} & \textbf{NMAE (\%)} & \textbf{Tempo (ms)} & \textbf{Acurado?} \\
+\midrule
+   50 & 11{,}52 & 1{,}13 & Sim \\
+  500 & 10{,}58 & 1{,}86 & Sim \\
+1.000 & 10{,}49 & 1{,}19 & Sim \\
+1.500 & 10{,}38 & 1{,}22 & Sim \\
+\textbf{2.520} & \textbf{10{,}39} & \textbf{2{,}59} & \textbf{Sim} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.72\textwidth]{figs/task_ii_2d_nmae_train_time.png}
+  \caption{NMAE (\%) e tempo de treino versus tamanho do conjunto de treino (Task~II).}
+  \label{fig:nmae_train}
+\end{figure}
+
+\textbf{Item 2(e):} com apenas 50 observações o NMAE já é aceitável ($\approx 11{,}5\%$);
+ganhos após 500 amostras são marginais --- caracterizando \textbf{retornos decrescentes}
+(Figura~\ref{fig:nmae_train}).
+
+\textbf{Item 2(f):} o tempo de treino permanece abaixo de 3~ms, insignificante frente
+ao volume de dados disponível, o que reforça a viabilidade de re-treinamento frequente
+em ambientes de monitoramento em tempo real.
 
 %% ============================================================
-\section{Task III -- Regressão Logística}
+\section{Task III --- Estimativa de Conformidade ao SLA (Classificação)}
 %% ============================================================
 
-\subsection{Objetivo e Métrica}
-
-Em vez de prever os fps exatos, o objetivo aqui é classificar cada instante como:
-\begin{itemize}
-  \item \textbf{Classe 1 (conforme):} \texttt{DispFrames} $\geq 18$ fps;
-  \item \textbf{Classe 0 (violação):} \texttt{DispFrames} $< 18$ fps.
-\end{itemize}
-
-A métrica é o \textbf{ERR} (taxa de classificação errada):
+Define-se rótulo~1 (conforme) se $\texttt{DispFrames} \geq 18$~fps e rótulo~0
+(violação) caso contrário. A métrica de avaliação é o ERR:
 \begin{equation}
   \text{ERR} = 1 - \frac{VP + VN}{m}
 \end{equation}
-onde VP = verdadeiros positivos, VN = verdadeiros negativos e $m = 1.080$.
-O critério é ERR $< 15\%$.
+onde VP e VN são verdadeiros positivos e negativos e $m = 1.080$. Classificador
+preciso se ERR $< 15\%$.
 
-\subsection{Implementação}
+O trecho a seguir mostra como os rótulos são criados e o classificador treinado:
 
-\begin{lstlisting}[caption={Criação dos rótulos e treinamento do classificador.}]
+\begin{lstlisting}[caption={Criação de rótulos e treinamento do classificador logístico (Task~III).}]
 from sklearn.linear_model import LogisticRegression
-from src.metrics import classification_error, sla_labels
+from src.metrics import sla_labels, classification_error
 
-# binariza Y: 1 se conforme, 0 se violacao
-y_bin = sla_labels(y, SLA_THRESHOLD_FPS)
+# binariza Y: 1 (conforme) se DispFrames >= 18, 0 (violacao) caso contrario
+y_bin_train = sla_labels(y_reg_train, SLA_THRESHOLD_FPS)
+y_bin_test  = sla_labels(y_reg_test,  SLA_THRESHOLD_FPS)
 
 clf = LogisticRegression(max_iter=10000, random_state=RANDOM_STATE)
 clf.fit(X_train, y_bin_train)
@@ -367,66 +472,60 @@ y_pred = clf.predict(X_test)
 err = classification_error(y_bin_test, y_pred)
 \end{lstlisting}
 
-\subsection{Balanceamento das Classes}
-
-No split de treino, aproximadamente 52\% das observações são conformes e 48\%
-em violação. No conjunto de teste, a proporção é 50/50. O balanceamento razoável
-entre as classes valida o uso de ERR como métrica primária.
-
-\subsection{Resultados}
+\subsection{Item 1 --- Desempenho dos classificadores C\textsubscript{1}\ldots{}C\textsubscript{5}}
 
 \begin{table}[H]
 \centering
-\caption{Resultados dos classificadores C1--C5 no conjunto de teste.}
-\label{tab:class_results}
-\begin{tabular}{rrrccrrrr}
+\caption{Desempenho dos classificadores C\textsubscript{1}\ldots{}C\textsubscript{5} no conjunto de teste.}
+\label{tab:clf_results}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{rrrcrrrrr}
 \toprule
-\textbf{Classif.} & \textbf{Treino} & \textbf{Tempo (ms)} & \textbf{ERR (\%)} & \textbf{Acurado?} & \textbf{VP} & \textbf{VN} & \textbf{FP} & \textbf{FN} \\
+\textbf{Clf.} & \textbf{Treino} & \textbf{Tempo (ms)} & \textbf{ERR (\%)} & \textbf{Acurado?} & \textbf{VP} & \textbf{VN} & \textbf{FP} & \textbf{FN} \\
 \midrule
-C1 &    50 &  119 & 15,37 & N\~{a}o & 438 & 476 & 59 & 107 \\
-C2 &   500 &  275 & 12,96 & Sim & 465 & 475 & 60 &  80 \\
-C3 & 1.000 &  262 & 12,87 & Sim & 464 & 477 & 58 &  81 \\
-C4 & 1.500 & 1373 & 11,39 & Sim & 479 & 478 & 57 &  66 \\
-\textbf{C5} & \textbf{2.520} & \textbf{2527} & \textbf{11,11} & \textbf{Sim} & \textbf{486} & \textbf{474} & \textbf{61} & \textbf{59} \\
+C1 &    50 &   118{,}95 & 15{,}37 & N\~{a}o & 438 & 476 & 59 & 107 \\
+C2 &   500 &   275{,}09 & 12{,}96 & Sim     & 465 & 475 & 60 &  80 \\
+C3 & 1.000 &   262{,}29 & 12{,}87 & Sim     & 464 & 477 & 58 &  81 \\
+C4 & 1.500 & 1.373{,}22 & 11{,}39 & Sim     & 479 & 478 & 57 &  66 \\
+\textbf{C5} & \textbf{2.520} & \textbf{2.526{,}55} & \textbf{11{,}11} & \textbf{Sim} & \textbf{486} & \textbf{474} & \textbf{61} & \textbf{59} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-C1 (50 amostras) não atinge o critério de 15\%, ficando no limite. A partir de C2 (500 amostras),
-todos os classificadores são acurados. C5 obtém o melhor ERR: \textbf{11,11\%}.
-O FN (serviço classif.\ como conforme quando viola) cai de 107 (C1) para 59 (C5),
-o que é importante do ponto de vista operacional -- falsos negativos levam o provedor
-a não agir em situações de violação real.
-
-\subsection{Visualizações}
+O melhor classificador foi C5, com ERR = 11{,}11\%. Com apenas 50 amostras de treino,
+ERR = 15{,}37\%, ligeiramente acima do limite. Os falsos negativos (FN) --- instâncias
+em violação classificadas como conformes --- caem de 107 (C1) para 59 (C5), o que é
+crítico do ponto de vista operacional: FN levam o provedor a não agir em situações de
+degradação real.
 
 \begin{figure}[H]
   \centering
-  \begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth]{figs/task_iii_1d_err_train_time.png}
-    \caption{ERR e tempo de treino vs.\ tamanho do treino.}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth]{figs/task_iii_1e_timeseries_classification.png}
-    \caption{Classificação de C5 no teste (verde = acerto, vermelho = erro).}
-  \end{subfigure}
-  \caption{Resultados da regressão logística (Task~III).}
-  \label{fig:class_results}
+  \includegraphics[width=0.72\textwidth]{figs/task_iii_1d_err_train_time.png}
+  \caption{ERR (\%) e tempo de treino versus tamanho do conjunto de treino (Task~III).}
+  \label{fig:err_train}
 \end{figure}
 
-A Figura~\ref{fig:class_results}a confirma a tendência decrescente do ERR com mais dados,
-com ganho expressivo entre 50 e 500 amostras e retornos decrescentes a partir daí.
-O tempo de treino cresce mais acentuadamente de 1.500 para 2.520 amostras, refletindo
-a natureza iterativa da regressão logística.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figs/task_iii_1e_timeseries_classification.png}
+  \caption{Série temporal de \texttt{DispFrames} no teste com classificações de C5
+           (verde = acerto, vermelho = erro).}
+  \label{fig:ts_clf}
+\end{figure}
 
-A Figura~\ref{fig:class_results}b mostra que os erros do melhor classificador (C5)
-se concentram próximos ao limiar de 18 fps -- região onde a separação entre as classes
-é intrinsecamente difícil. Longe do limiar, o modelo classifica corretamente com
+\textbf{Item 1(f):} erros concentram-se próximo a 18~fps --- fronteira entre classes
+(Figura~\ref{fig:ts_clf}). Longe do limiar, o modelo classifica corretamente com
 alta consistência.
 
+\textbf{Item 1(g):} mais dados de treino reduzem ERR de forma consistente
+(Figura~\ref{fig:err_train}), com ganho expressivo entre 50 e 500 amostras e
+retornos decrescentes a partir daí.
+
+\textbf{Item 1(h):} o tempo de treino cresce com o dataset (de $\approx 119$~ms a
+$\approx 2.527$~ms), mas permanece prático para uso em produção ou re-treinamento periódico.
+
 %% ============================================================
-\section{Atividade Bônus -- 5G Datasets Challenge (Atividade A)}
+\section{Atividade Bônus --- 5G Datasets Challenge (Atividade A)}
 %% ============================================================
 
 \subsection{Descrição}
@@ -445,7 +544,7 @@ Foram utilizados três traces do dataset \texttt{g-nettrack-pro}:
 \toprule
 \textbf{Arquivo} & \textbf{Cenário} \\
 \midrule
-\texttt{2023-01-21\_308-walking-paulista-1.txt} & Pedestre -- Av.\ Paulista \\
+\texttt{2023-01-21\_308-walking-paulista-1.txt} & Pedestre --- Av.\ Paulista \\
 \texttt{2023-01-22\_933-driving-sp-1.txt}       & Veículo em deslocamento \\
 \texttt{2023-01-21\_244-subway-1.txt}           & Metrô \\
 \bottomrule
@@ -468,13 +567,13 @@ registros. O mesmo protocolo de split 70/30 com \texttt{random\_state=42} foi ap
 \textbf{Métrica} & \textbf{Valor} & \textbf{Interpretação} \\
 \midrule
 MAE  & 3,20 dB & Erro médio absoluto entre \texttt{Qual} medido e estimado \\
-RMSE & 3,80 dB & Raiz do EQM -- penaliza erros grandes \\
+RMSE & 3,80 dB & Raiz do EQM --- penaliza erros grandes \\
 R²   & 0,29    & Fração da variância de \texttt{Qual} explicada pelo modelo \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O coeficiente de determinação $R^2 = 0{,}29$ indica relação parcial -- esperado para
+O coeficiente de determinação $R^2 = 0{,}29$ indica relação parcial --- esperado para
 um modelo linear simples aplicado a dados heterogêneos que combinam cenários de
 pedestre, veículo e metrô (indoor/outdoor), com eventos de handover não modelados.
 A variável SNR é a de maior influência ($\Theta = +0{,}346$): maior relação
@@ -498,7 +597,7 @@ sinal-ruído está associada a melhor qualidade de sinal estimada.
 O scatter plot (Figura~\ref{fig:bonus}a) mostra dispersão considerável em torno da diagonal,
 confirmando $R^2$ moderado. O KDE dos erros (Figura~\ref{fig:bonus}b) apresenta distribuição
 aproximadamente simétrica centrada em zero, sem viés sistemático de superestimação ou
-subestimação -- o modelo erra de forma equilibrada, o que é desejável.
+subestimação --- o modelo erra de forma equilibrada, o que é desejável.
 
 %% ============================================================
 \section{Conclusão}
@@ -510,7 +609,7 @@ estimar conformidade a SLAs em serviços VoD a partir de métricas do servidor.
 Na Task~II, a regressão linear atingiu NMAE de \textbf{10,39\%} (abaixo do limite de 15\%),
 com retornos decrescentes a partir de 500 amostras de treino. Na Task~III, o melhor
 classificador logístico (C5) obteve ERR de \textbf{11,11\%}, com os erros concentrados
-na fronteira de 18 fps -- região inerentemente ambígua.
+na fronteira de 18 fps --- região inerentemente ambígua.
 
 As principais limitações são: (i) a linearidade dos modelos, que pode não capturar
 relações não lineares; (ii) o split aleatório, que pode misturar padrões temporais;
