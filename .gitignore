@@ -1,0 +1,59 @@
+
+
+relatorio_PGC308A_2026_final.pdf
+relatorio/
+scripts/
+
+# ------------------------------------------------------------
+# Pasta de geração do relatório (arquivos de build)
+# ------------------------------------------------------------
+relatorio/*.aux
+relatorio/*.log
+relatorio/*.out
+relatorio/*.toc
+relatorio/*.synctex.gz
+relatorio/*.fdb_latexmk
+relatorio/*.fls
+
+# ------------------------------------------------------------
+# Python
+# ------------------------------------------------------------
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+.env
+
+# ------------------------------------------------------------
+# Jupyter Notebooks — checkpoints automáticos
+# ------------------------------------------------------------
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# ------------------------------------------------------------
+# Editor / IDE
+# ------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ------------------------------------------------------------
+# Sistema operacional
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------
+# Arquivos temporários
+# ------------------------------------------------------------
+*.tmp
+*.bak
